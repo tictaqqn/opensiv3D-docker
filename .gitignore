@@ -5,3 +5,6 @@ test/*
 !test/make_release.sh
 !test/resources
 !test/test.cpp
+my-files/*/*
+!my-files/*/*.cpp
+!my-files/*/*.sh
