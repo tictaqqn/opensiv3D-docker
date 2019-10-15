@@ -213,15 +213,19 @@ class VisibilityMap {
 			    const Line rightRay(eyePos,
                     eyePos + Vec2::Right().rotated(right) * m_maxDistance);
 
+				#ifdef SHOW
                 leftRay.draw();
                 rightRay.draw();
+				#endif
 
                 Vec2 leftCollidePoint = leftRay.end;
                 Vec2 rightCollidePoint = rightRay.end;
 
                 for (const auto& line : m_lines) {
                     if (const auto p = leftRay.intersectsAt(line)) {
+						#ifdef SHOW
                         Circle(*p, 4).draw(Palette::Yellow);
+						#endif
 
                         if (p->distanceFromSq(eyePos) < leftCollidePoint.distanceFromSq(eyePos)) {
                             leftCollidePoint = p.value();
@@ -229,7 +233,9 @@ class VisibilityMap {
                     }
                     if (const auto p = rightRay.intersectsAt(line))
                     {
+						#ifdef SHOW
                         Circle(*p, 4).draw(Palette::Yellow);
+						#endif
 
                         if (p->distanceFromSq(eyePos) < rightCollidePoint.distanceFromSq(eyePos))
                         {
@@ -237,8 +243,10 @@ class VisibilityMap {
                         }
                     }
                 }
+				#ifdef SHOW
                 Circle(leftCollidePoint, 6).draw(Palette::Red);
                 Circle(rightCollidePoint, 6).draw(Palette::Red);
+				#endif
 
                 points.emplace_back(leftCollidePoint, rightCollidePoint);
             }
@@ -246,7 +254,7 @@ class VisibilityMap {
         }
     public:
         explicit VisibilityMap(const RectF& region = RectF(640, 480))
-            : m_region(region)
+            : m_region(region), m_maxDistance(m_region.w + m_region.h)
         {
             add(m_region);
         }
@@ -256,65 +264,66 @@ class VisibilityMap {
             m_lines.emplace_back(s.p2, s.p0);
         }
         void add(const RectF& s)
-	{
-		m_lines.emplace_back(s.tl(), s.tr());
-		m_lines.emplace_back(s.tr(), s.br());
-		m_lines.emplace_back(s.br(), s.bl());
-		m_lines.emplace_back(s.bl(), s.tl());
-	}
-
-	void add(const Quad& s)
-	{
-		m_lines.emplace_back(s.p0, s.p1);
-		m_lines.emplace_back(s.p1, s.p2);
-		m_lines.emplace_back(s.p2, s.p3);
-		m_lines.emplace_back(s.p3, s.p0);
-	}
-
-	void add(const Circle& s, int32 quality = 8)
-	{
-		quality = Max(quality, 6);
-		
-		const double da = 2_pi / quality;
-
-		for (auto i : step(quality))
 		{
-			m_lines.emplace_back(OffsetCircular(s.center, s.r, da * i), OffsetCircular(s.center, s.r, da * (i + 1)));
-		}
-	}
-
-	void add(const Polygon& s)
-	{
-		const auto& outer = s.outer();
-
-		for (auto i : step(outer.size()))
-		{
-			m_lines.emplace_back(outer[i], outer[(i + 1) % outer.size()]);
-		}
-	}
-
-	const RectF& getRegion() const
-	{
-		return m_region;
-	}
-
-	const Array<Line>& getLines() const
-	{
-		return m_lines;
-	}
-	Array<Triangle> calculateVisibilityTriangles(const Vec2& eyePos) const
-	{
-		const auto points = calculateCollidePoints(eyePos);
-
-		Array<Triangle> triangles(points.size());
-
-		for (auto i : step(triangles.size()))
-		{
-			triangles[i].set(eyePos, points[i].second, points[(i + 1) % points.size()].first);
+			m_lines.emplace_back(s.tl(), s.tr());
+			m_lines.emplace_back(s.tr(), s.br());
+			m_lines.emplace_back(s.br(), s.bl());
+			m_lines.emplace_back(s.bl(), s.tl());
 		}
 
-		return triangles;
-	}
+		void add(const Quad& s)
+		{
+			m_lines.emplace_back(s.p0, s.p1);
+			m_lines.emplace_back(s.p1, s.p2);
+			m_lines.emplace_back(s.p2, s.p3);
+			m_lines.emplace_back(s.p3, s.p0);
+		}
+
+		void add(const Circle& s, int32 quality = 8)
+		{
+			quality = Max(quality, 6);
+			
+			const double da = 2_pi / quality;
+
+			for (auto i : step(quality))
+			{
+				m_lines.emplace_back(OffsetCircular(s.center, s.r, da * i), OffsetCircular(s.center, s.r, da * (i + 1)));
+			}
+		}
+
+		void add(const Polygon& s)
+		{
+			const auto& outer = s.outer();
+
+			for (auto i : step(outer.size()))
+			{
+				m_lines.emplace_back(outer[i], outer[(i + 1) % outer.size()]);
+			}
+		}
+
+		const RectF& getRegion() const
+		{
+			return m_region;
+		}
+
+		const Array<Line>& getLines() const
+		{
+			return m_lines;
+		}
+		Array<Triangle> calculateVisibilityTriangles(const Vec2& eyePos) const
+		{
+			const auto points = calculateCollidePoints(eyePos);
+
+			Array<Triangle> triangles(points.size());
+			// printf("nnn");
+			for (auto i : step(triangles.size()))
+			{
+				// printf("aaa");
+				triangles[i].set(eyePos, points[i].second, points[(i + 1) % points.size()].first);
+			}
+
+			return triangles;
+		}
 };
 
 void Main() {
@@ -359,15 +368,17 @@ void Main() {
         //     polygon.draw(objectColor);
 
         map.getRegion().drawFrame(0, 8, objectColor);
-        for (const auto& line : map.getLines()) {
-            line.draw(3, Palette::Yellow);
-        }
+		// 輪郭をかく
+        // for (const auto& line : map.getLines()) {
+        //     line.draw(3, Palette::Yellow);
+        // }
         const Vec2 eyePos = Cursor::Pos();
 
 		const auto vTriangles = map.calculateVisibilityTriangles(eyePos);
 
 		for (const auto& vTriangle : vTriangles)
 		{
+			// printf("ja");
 			vTriangle.draw(ColorF(1.0, 0.5));
 
 			// vTriangle.drawFrame(2, Palette::Limegreen);
