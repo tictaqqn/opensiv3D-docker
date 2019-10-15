@@ -1,12 +1,22 @@
 #include <Siv3D.hpp>
 
 
+//-----------------------------------------------
+//
+//	This file uses part of the Siv3D Engine.
+//
+//	Copyright (c) 2008-2019 Ryo Suzuki
+//	Copyright (c) 2016-2019 OpenSiv3D Project
+//
+//	Licensed under the MIT License.
+//
+//-----------------------------------------------
 	/// <summary>
 	/// 円座標
 	/// </summary>
 	template <int32 Oclock>
-	struct OffsetCircularBase
-	{
+struct OffsetCircularBase
+{
 	private:
 
 		[[nodiscard]] static constexpr double Clamp(const double theta) noexcept
@@ -160,99 +170,80 @@
 		{
 			return toVec2();
 		}
-	};
+};
 
-	using OffsetCircular  = OffsetCircularBase<0>;
-	using OffsetCircular0 = OffsetCircularBase<0>;
-	using OffsetCircular3 = OffsetCircularBase<3>;
-	using OffsetCircular6 = OffsetCircularBase<6>;
-	using OffsetCircular9 = OffsetCircularBase<9>;
+using OffsetCircular  = OffsetCircularBase<0>;
+using OffsetCircular0 = OffsetCircularBase<0>;
+using OffsetCircular3 = OffsetCircularBase<3>;
+using OffsetCircular6 = OffsetCircularBase<6>;
+using OffsetCircular9 = OffsetCircularBase<9>;
 
 
-//////////////////////////////////////////////////////////////////////////////
-//
-//  Formatting CircularOffsetBase
-//
-//  [x] Siv3D Formatter
-//  [x] ostream
-//  [x] wostream
-//  [x] istream
-//  [x] wistream
-//  [x] fmtlib BasicFormatter<wchar>
-//
-// namespace s3d
-// {
-//     template <int32 Oclock>
-//     inline void Formatter(FormatData& formatData, const CircularOffsetBase<Oclock>& c)
-//     {
-//         Formatter(formatData, Vec4(c.center, c.r, c.theta));
-//     }
 
-//     /// <summary>
-//     /// 出力ストリームに円座標を渡します。
-//     /// </summary>
-//     /// <param name="os">
-//     /// 出力ストリーム
-//     /// </param>
-//     /// <param name="c">
-//     /// 円座標
-//     /// </param>
-//     /// <returns>
-//     /// 渡した後の出力ストリーム
-//     /// </returns>
-//     template <class CharType, int32 Oclock>
-//     inline std::basic_ostream<CharType>& operator <<(std::basic_ostream<CharType>& os, const CircularOffsetBase<Oclock>& c)
-//     {
-//         return os << CharType('(')
-//             << c.center.x << CharType(',')
-//             << c.center.y << CharType(',')
-//             << c.r << CharType(',')
-//             << c.theta << CharType(')');
-//     }
-
-//     /// <summary>
-//     /// 入力ストリームに円座標を渡します。
-//     /// </summary>
-//     /// <param name="is">
-//     /// 入力ストリーム
-//     /// </param>
-//     /// <param name="c">
-//     /// 円座標
-//     /// </param>
-//     /// <returns>
-//     /// 渡した後の入力ストリーム
-//     /// </returns>
-//     template <class CharType, int32 Oclock>
-//     inline std::basic_istream<CharType>& operator >>(std::basic_istream<CharType>& is, CircularOffsetBase<Oclock>& c)
-//     {
-//         CharType unused;
-//         return is >> unused
-//             >> c.center.x >> unused
-//             >> c.center.y >> unused
-//             >> c.r >> unused
-//             >> c.theta >> unused;
-//     }
-// }
-
-// namespace fmt
-// {
-//     template <class ArgFormatter, s3d::int32 Oclock>
-//     void format_arg(BasicFormatter<s3d::wchar, ArgFormatter>& f, const s3d::wchar*& format_str, const s3d::CircularOffsetBase<Oclock>& c)
-//     {
-//         const auto tag = s3d::detail::GetTag(format_str);
-
-//         const auto fmt = S3DSTR("({") + tag + S3DSTR("},{") + tag + S3DSTR("},{") + tag + S3DSTR("},{") + tag + S3DSTR("})");
-
-//         f.writer().write(fmt, c.center.x, c.center.y, c.r, c.theta);
-//     }
-// }
-//
 //////////////////////////////////////////////////////////////////////////////
 
 class VisibilityMap {
     private:
+        static constexpr double m_epsilon = 1e-10;
         RectF m_region;
+        double m_maxDistance = 0.0;
         Array<Line> m_lines;
+
+        const Array< std::pair<Vec2, Vec2> > calculateCollidePoints(const Vec2& eyePos) const {
+
+            // if (!m_region.stretched(-1).contains(eyePos)) return {};
+
+            Array<double> angles;
+            angles.reserve(m_lines.size());
+            {
+                for (const auto& line : m_lines) {
+                    const Vec2 v = line.begin - eyePos;
+                    angles.push_back(Math::Atan2(v.y, v.x));
+                }
+                std::sort(angles.begin(), angles.end());
+            }
+            Array< std::pair<Vec2, Vec2> > points;
+            points.reserve(angles.size());
+
+            for (auto angle : angles) {
+                const double left = angle - m_epsilon;
+                const double right = angle + m_epsilon;
+                const Line leftRay(eyePos, 
+                    eyePos + Vec2::Right().rotated(left) * m_maxDistance);
+			    const Line rightRay(eyePos,
+                    eyePos + Vec2::Right().rotated(right) * m_maxDistance);
+
+                leftRay.draw();
+                rightRay.draw();
+
+                Vec2 leftCollidePoint = leftRay.end;
+                Vec2 rightCollidePoint = rightRay.end;
+
+                for (const auto& line : m_lines) {
+                    if (const auto p = leftRay.intersectsAt(line)) {
+                        Circle(*p, 4).draw(Palette::Yellow);
+
+                        if (p->distanceFromSq(eyePos) < leftCollidePoint.distanceFromSq(eyePos)) {
+                            leftCollidePoint = p.value();
+                        }
+                    }
+                    if (const auto p = rightRay.intersectsAt(line))
+                    {
+                        Circle(*p, 4).draw(Palette::Yellow);
+
+                        if (p->distanceFromSq(eyePos) < rightCollidePoint.distanceFromSq(eyePos))
+                        {
+                            rightCollidePoint = p.value();
+                        }
+                    }
+                }
+                Circle(leftCollidePoint, 6).draw(Palette::Red);
+                Circle(rightCollidePoint, 6).draw(Palette::Red);
+
+                points.emplace_back(leftCollidePoint, rightCollidePoint);
+            }
+            return points;
+        }
     public:
         explicit VisibilityMap(const RectF& region = RectF(640, 480))
             : m_region(region)
@@ -311,6 +302,19 @@ class VisibilityMap {
 	{
 		return m_lines;
 	}
+	Array<Triangle> calculateVisibilityTriangles(const Vec2& eyePos) const
+	{
+		const auto points = calculateCollidePoints(eyePos);
+
+		Array<Triangle> triangles(points.size());
+
+		for (auto i : step(triangles.size()))
+		{
+			triangles[i].set(eyePos, points[i].second, points[(i + 1) % points.size()].first);
+		}
+
+		return triangles;
+	}
 };
 
 void Main() {
@@ -328,6 +332,19 @@ void Main() {
     };
     // const Array<Polygon> polygons{ Shape2D::Star(60, Vec2(940, 180)) };
     VisibilityMap map(Rect(40, 40, 1200, 640));
+	{
+		for (const auto& triangle : triangles)
+			map.add(triangle);
+
+		for (const auto& rect : rects)
+			map.add(rect);
+
+		for (const auto& circle : circles)
+			map.add(circle, 12);
+
+		// for (const auto& polygon : polygons)
+		// 	map.add(polygon);
+	}
 
     while (System::Update()) {
         // Cursor::RequestStyle(CursorStyle::Hidden);
@@ -346,6 +363,16 @@ void Main() {
             line.draw(3, Palette::Yellow);
         }
         const Vec2 eyePos = Cursor::Pos();
+
+		const auto vTriangles = map.calculateVisibilityTriangles(eyePos);
+
+		for (const auto& vTriangle : vTriangles)
+		{
+			vTriangle.draw(ColorF(1.0, 0.5));
+
+			// vTriangle.drawFrame(2, Palette::Limegreen);
+		}
+
         Circle(eyePos, 20).draw(Palette::Orange).drawFrame(1, 2);
     }
 }
