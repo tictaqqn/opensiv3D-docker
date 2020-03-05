@@ -8,3 +8,4 @@ test/*
 my-files/*/*
 !my-files/*/*.cpp
 !my-files/*/*.sh
+.vscode/
