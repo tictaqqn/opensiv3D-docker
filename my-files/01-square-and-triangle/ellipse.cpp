@@ -63,7 +63,7 @@ void Main()
 	// 1 つの関数について複数バリエーション用意するのが好ましい
 	//
 
-    Ellipse el1(0, 0, 100, 200);
+        Ellipse el1(0, 0, 100, 200);
 
 	while (System::Update())
 	{
